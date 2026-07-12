@@ -141,7 +141,7 @@ export function ResultScreen({ onRetry }: ResultScreenProps) {
             )}
             {result.accuracy >= 98 && (
               <Badge className="bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/20 border">
-                🎯 Akurasi Tinggi
+                 Akurasi Tinggi
               </Badge>
             )}
             {gainedXp !== null && gainedXp > 0 && (
@@ -151,7 +151,7 @@ export function ResultScreen({ onRetry }: ResultScreenProps) {
                 transition={{ delay: 0.3, type: "spring", stiffness: 300 }}
               >
                 <Badge className="bg-primary/10 text-primary border-primary/20 border">
-                  ⚡ +{gainedXp} XP
+                   +{gainedXp} XP
                 </Badge>
               </motion.div>
             )}
@@ -162,7 +162,7 @@ export function ResultScreen({ onRetry }: ResultScreenProps) {
           )}
           {!user && (
             <p className="text-xs text-muted-foreground">
-              💡 Login untuk menyimpan hasil dan mendapatkan XP.
+               Login untuk menyimpan hasil dan mendapatkan XP.
             </p>
           )}
 
