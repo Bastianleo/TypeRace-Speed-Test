@@ -207,7 +207,7 @@ export default function LoginPage() {
   const { user, isLoading, login, checkSession } = useAuthStore();
   const router = useRouter();
   const [activeTab, setActiveTab] = useState<ActiveTab>("login");
-  
+
   // Login Form States
   const [loginUsername, setLoginUsername] = useState("");
   const [loginPassword, setLoginPassword] = useState("");
@@ -217,7 +217,7 @@ export default function LoginPage() {
   const [registerUsername, setRegisterUsername] = useState("");
   const [registerEmail, setRegisterEmail] = useState("");
   const [registerPassword, setRegisterPassword] = useState("");
-  const [selectedCountry, setSelectedCountry] = useState(COUNTRIES[0]);
+  const [selectedCountry, setSelectedCountry] = useState(COUNTRIES[0]!);
   const [registerError, setRegisterError] = useState("");
   const [countrySearch, setCountrySearch] = useState("");
   const [countryDropdownOpen, setCountryDropdownOpen] = useState(false);
@@ -310,7 +310,7 @@ export default function LoginPage() {
         <div className="relative w-full max-w-md">
           {/* Subtle decorative glowing background circle */}
           <div className="absolute -inset-0.5 -z-10 rounded-2xl bg-gradient-to-r from-primary/30 to-muted-foreground/30 opacity-30 blur-2xl transition duration-1000 group-hover:duration-200" />
-          
+
           <Card className="border border-border bg-card/75 backdrop-blur-md shadow-2xl">
             <CardHeader className="space-y-2 text-center">
               <CardTitle className="text-2xl font-bold tracking-tight">
