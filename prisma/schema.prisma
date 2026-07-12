@@ -1,0 +1,222 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model Achievement {
+  id              String            @id @default(cuid())
+  code            String            @unique
+  title           String
+  description     String
+  iconUrl         String?
+  xpReward        Int               @default(0)
+  UserAchievement UserAchievement[]
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model DailyChallenge {
+  id                    String                  @id @default(cuid())
+  date                  DateTime                @unique
+  textContent           String
+  language              TextLanguage
+  difficulty            Difficulty
+  xpReward              Int                     @default(50)
+  DailyChallengeAttempt DailyChallengeAttempt[]
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model DailyChallengeAttempt {
+  id               String         @id @default(cuid())
+  dailyChallengeId String
+  userId           String
+  wpm              Int
+  accuracy         Float
+  completedAt      DateTime       @default(now())
+  DailyChallenge   DailyChallenge @relation(fields: [dailyChallengeId], references: [id], onDelete: Cascade)
+  User             User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([dailyChallengeId, userId])
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model Friendship {
+  id                                String   @id @default(cuid())
+  requesterId                       String
+  addresseeId                       String
+  accepted                          Boolean  @default(false)
+  createdAt                         DateTime @default(now())
+  User_Friendship_addresseeIdToUser User     @relation("Friendship_addresseeIdToUser", fields: [addresseeId], references: [id], onDelete: Cascade)
+  User_Friendship_requesterIdToUser User     @relation("Friendship_requesterIdToUser", fields: [requesterId], references: [id], onDelete: Cascade)
+
+  @@unique([requesterId, addresseeId])
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model Report {
+  id                           String   @id @default(cuid())
+  reporterId                   String
+  targetId                     String
+  reason                       String
+  details                      String?
+  resolved                     Boolean  @default(false)
+  createdAt                    DateTime @default(now())
+  User_Report_reporterIdToUser User     @relation("Report_reporterIdToUser", fields: [reporterId], references: [id], onDelete: Cascade)
+  User_Report_targetIdToUser   User     @relation("Report_targetIdToUser", fields: [targetId], references: [id], onDelete: Cascade)
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model Room {
+  id              String            @id @default(cuid())
+  code            String            @unique
+  hostId          String
+  visibility      RoomVisibility    @default(PUBLIC)
+  passwordHash    String?
+  status          RoomStatus        @default(WAITING)
+  maxPlayers      Int               @default(8)
+  textSourceId    String?
+  createdAt       DateTime          @default(now())
+  startedAt       DateTime?
+  finishedAt      DateTime?
+  User            User              @relation(fields: [hostId], references: [id])
+  RoomParticipant RoomParticipant[]
+
+  @@index([status])
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model RoomParticipant {
+  id           String    @id @default(cuid())
+  roomId       String
+  userId       String
+  isReady      Boolean   @default(false)
+  isSpectator  Boolean   @default(false)
+  progress     Float     @default(0)
+  liveWpm      Int       @default(0)
+  liveAccuracy Float     @default(0)
+  finishRank   Int?
+  finishedAt   DateTime?
+  disconnected Boolean   @default(false)
+  joinedAt     DateTime  @default(now())
+  Room         Room      @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  User         User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([roomId, userId])
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model TextSource {
+  id         String       @id @default(cuid())
+  title      String
+  content    String
+  language   TextLanguage
+  difficulty Difficulty
+  isActive   Boolean      @default(true)
+  createdAt  DateTime     @default(now())
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model TypingResult {
+  id              String       @id @default(cuid())
+  userId          String
+  mode            String       @default("solo")
+  durationSeconds Int
+  language        TextLanguage
+  difficulty      Difficulty
+  wpm             Int
+  rawWpm          Int
+  accuracy        Float
+  consistency     Float
+  correctChars    Int
+  incorrectChars  Int
+  errors          Int
+  grade           String
+  createdAt       DateTime     @default(now())
+  User            User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+  @@index([wpm])
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model User {
+  id                                      String                  @id @default(cuid())
+  email                                   String                  @unique
+  username                                String                  @unique
+  displayName                             String?
+  avatarUrl                               String?
+  bio                                     String?
+  country                                 String?
+  role                                    Role                    @default(USER)
+  xp                                      Int                     @default(0)
+  level                                   Int                     @default(1)
+  createdAt                               DateTime                @default(now())
+  updatedAt                               DateTime                @updatedAt
+  passwordHash                            String?
+  DailyChallengeAttempt                   DailyChallengeAttempt[]
+  Friendship_Friendship_addresseeIdToUser Friendship[]            @relation("Friendship_addresseeIdToUser")
+  Friendship_Friendship_requesterIdToUser Friendship[]            @relation("Friendship_requesterIdToUser")
+  Report_Report_reporterIdToUser          Report[]                @relation("Report_reporterIdToUser")
+  Report_Report_targetIdToUser            Report[]                @relation("Report_targetIdToUser")
+  Room                                    Room[]
+  RoomParticipant                         RoomParticipant[]
+  TypingResult                            TypingResult[]
+  UserAchievement                         UserAchievement[]
+
+  @@index([country])
+  @@index([xp])
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model UserAchievement {
+  id            String      @id @default(cuid())
+  userId        String
+  achievementId String
+  unlockedAt    DateTime    @default(now())
+  Achievement   Achievement @relation(fields: [achievementId], references: [id], onDelete: Cascade)
+  User          User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, achievementId])
+}
+
+enum Difficulty {
+  EASY
+  MEDIUM
+  HARD
+  EXPERT
+  CUSTOM
+}
+
+enum Role {
+  USER
+  ADMIN
+}
+
+enum RoomStatus {
+  WAITING
+  COUNTDOWN
+  RUNNING
+  FINISHED
+}
+
+enum RoomVisibility {
+  PUBLIC
+  PRIVATE
+  PASSWORD
+}
+
+enum TextLanguage {
+  INDONESIA
+  ENGLISH
+  PROGRAMMING
+  RANDOM_WORDS
+  ARTICLE
+  NOVEL
+  QUOTES
+  CUSTOM
+}

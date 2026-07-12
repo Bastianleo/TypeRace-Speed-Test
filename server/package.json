@@ -1,0 +1,20 @@
+{
+  "name": "typing-race-server",
+  "version": "1.0.0",
+  "description": "Socket.IO server for TypeRace multiplayer",
+  "main": "index.js",
+  "scripts": {
+    "dev": "nodemon index.js",
+    "start": "node index.js"
+  },
+  "dependencies": {
+    "socket.io": "^4.8.0",
+    "@supabase/supabase-js": "^2.45.5",
+    "express": "^4.18.2",
+    "cors": "^2.8.5",
+    "dotenv": "^16.3.1"
+  },
+  "devDependencies": {
+    "nodemon": "^3.0.1"
+  }
+}
