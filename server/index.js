@@ -10,9 +10,9 @@ const app = express();
 const httpServer = createServer(app);
 const io = new Server(httpServer, {
   cors: {
-    origin: process.env.NODE_ENV === 'production' 
-      ? ['https://your-domain.com'] 
-      : ['http://localhost:3000'],
+    origin: process.env.FRONTEND_URL 
+      ? process.env.FRONTEND_URL.split(',') 
+      : '*',
     methods: ['GET', 'POST']
   }
 });
