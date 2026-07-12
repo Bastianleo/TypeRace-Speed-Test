@@ -27,7 +27,7 @@ export function LoginModal() {
   const [tab, setTab] = useState<Tab>("google");
   const [username, setUsername] = useState("");
   const [email, setEmail] = useState("");
-  const [selectedCountry, setSelectedCountry] = useState(COUNTRIES[0]);
+  const [selectedCountry, setSelectedCountry] = useState(COUNTRIES[0]!);
   const [error, setError] = useState("");
 
   const handleUsernameSubmit = async (e: React.FormEvent) => {
@@ -98,7 +98,7 @@ export function LoginModal() {
                         : "text-muted-foreground hover:text-foreground"
                     }`}
                   >
-                    {t === "google" ? "🔑 Google" : "👤 Username"}
+                    {t === "google" ? " Google" : " Username"}
                   </button>
                 ))}
               </div>
@@ -226,7 +226,7 @@ export function LoginModal() {
                       {isLoading ? (
                         <span className="h-4 w-4 animate-spin rounded-full border-2 border-primary-foreground/30 border-t-primary-foreground" />
                       ) : (
-                        "⚡ Masuk & Mulai"
+                        " Masuk & Mulai"
                       )}
                     </button>
 
