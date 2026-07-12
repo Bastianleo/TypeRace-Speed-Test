@@ -49,6 +49,7 @@ export interface Player {
   isFinished: boolean;
   finishRank?: number;
   isBot?: boolean;
+  isReady?: boolean;
 }
 
 export interface Room {

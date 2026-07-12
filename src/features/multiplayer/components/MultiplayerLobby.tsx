@@ -390,7 +390,7 @@ export function MultiplayerLobby() {
                 <span>·</span>
                 <span>{DIFFICULTY_OPTIONS.find((d) => d.value === room.settings!.difficulty)?.label}</span>
                 <span>·</span>
-                <span>{LANGUAGE_OPTIONS.find((l) => l.value === room.settings!.language)?.label}</span>
+                <span>{ALL_LANGUAGE_ITEMS.find((l) => l.value === room.settings!.language)?.label}</span>
               </div>
             )}
           </div>
