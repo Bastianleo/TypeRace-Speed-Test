@@ -13,7 +13,7 @@ Pastikan sudah menginstal:
 ## Clone Repository
 
 ```bash
-git clone https://github.com/username/typing-speed-test.git
+git clone https://github.com/Bastianleo/TypeRace-Speed-Test.git
 cd typing-speed-test
 ```
 
