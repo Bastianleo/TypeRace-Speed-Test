@@ -289,7 +289,7 @@ export function ProfileCard() {
                   <span className="text-xs text-muted-foreground">@{user?.username}</span>
                 </div>
                 {saveSuccess && (
-                  <p className="text-xs text-green-500">✓ Profil berhasil diperbarui!</p>
+                  <p className="text-xs text-green-500">Profil berhasil diperbarui!</p>
                 )}
               </>
             )}
@@ -325,7 +325,7 @@ export function ProfileCard() {
               <>
                 {!isEditing && (
                   <Button variant="outline" onClick={startEdit}>
-                    ✏️ Edit Profil
+                    Edit Profil
                   </Button>
                 )}
                 <Button variant="destructive" onClick={handleLogout}>

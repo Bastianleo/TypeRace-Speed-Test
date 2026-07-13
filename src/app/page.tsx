@@ -10,22 +10,18 @@ const GLOBAL_STATS = [
 
 const FEATURES = [
   {
-    icon: "📊",
     title: "Statistik Real-time",
     desc: "WPM, akurasi, konsistensi, dan grafik live saat Anda mengetik.",
   },
   {
-    icon: "🏎️",
     title: "Multiplayer Realtime",
     desc: "Balapan mengetik langsung melawan pemain lain di seluruh dunia.",
   },
   {
-    icon: "🏆",
     title: "Leaderboard Global",
     desc: "Peringkat mingguan, bulanan, per negara, hingga teman.",
   },
   {
-    icon: "⌨️",
     title: "Keyboard Virtual",
     desc: "Visualisasi tombol yang harus ditekan, mendukung layout TKL.",
   },
@@ -78,12 +74,12 @@ const MULTI_STEPS = [
 ];
 
 const TIPS = [
-  { icon: "🎯", tip: "Fokus pada akurasi dulu, kecepatan akan mengikuti secara alami seiring latihan." },
-  { icon: "👀", tip: "Jangan melihat keyboard — latih mata untuk selalu fokus ke teks di layar." },
-  { icon: "🧘", tip: "Jaga postur tubuh dan posisi tangan yang nyaman agar bisa mengetik lebih lama." },
-  { icon: "🔄", tip: "Latihan rutin 10–15 menit sehari lebih efektif daripada satu sesi panjang." },
-  { icon: "📈", tip: "Gunakan mode \"Sulit\" atau \"Expert\" untuk memaksa otak beradaptasi lebih cepat." },
-  { icon: "⌨️", tip: "Manfaatkan keyboard virtual untuk mengetahui jari mana yang harus menekan tombol tertentu." },
+  { tip: "Fokus pada akurasi dulu, kecepatan akan mengikuti secara alami seiring latihan." },
+  { tip: "Jangan melihat keyboard — latih mata untuk selalu fokus ke teks di layar." },
+  { tip: "Jaga postur tubuh dan posisi tangan yang nyaman agar bisa mengetik lebih lama." },
+  { tip: "Latihan rutin 10–15 menit sehari lebih efektif daripada satu sesi panjang." },
+  { tip: "Gunakan mode \"Sulit\" atau \"Expert\" untuk memaksa otak beradaptasi lebih cepat." },
+  { tip: "Manfaatkan keyboard virtual untuk mengetahui jari mana yang harus menekan tombol tertentu." },
 ];
 
 export default function LandingPage() {
@@ -127,13 +123,10 @@ export default function LandingPage() {
         {FEATURES.map((f) => (
           <div
             key={f.title}
-            className="flex items-start gap-3 rounded-xl border border-border p-5 transition-colors hover:border-primary/40 hover:bg-accent/30"
+            className="rounded-xl border border-border p-5 transition-colors hover:border-primary/40 hover:bg-accent/30"
           >
-            <span className="text-2xl">{f.icon}</span>
-            <div>
-              <p className="font-medium">{f.title}</p>
-              <p className="text-sm text-muted-foreground">{f.desc}</p>
-            </div>
+            <p className="font-medium">{f.title}</p>
+            <p className="mt-1 text-sm text-muted-foreground">{f.desc}</p>
           </div>
         ))}
       </section>
@@ -228,9 +221,8 @@ export default function LandingPage() {
               {TIPS.map((t, i) => (
                 <div
                   key={i}
-                  className="flex items-start gap-3 rounded-xl border border-border bg-card px-4 py-3"
+                  className="rounded-xl border border-border bg-card px-4 py-3"
                 >
-                  <span className="text-xl flex-shrink-0 mt-0.5">{t.icon}</span>
                   <p className="text-sm text-muted-foreground leading-relaxed">{t.tip}</p>
                 </div>
               ))}
