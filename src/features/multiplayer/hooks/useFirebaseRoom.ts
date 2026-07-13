@@ -38,6 +38,7 @@ export function useFirebaseRoom(options: UseFirebaseRoomOptions = {}) {
   const optionsRef = useRef(options);
   optionsRef.current = options;
 
+  // Use refs to always access the latest values inside async callbacks
   const activeRoomIdRef = useRef<string | null>(null);
   activeRoomIdRef.current = activeRoomId;
 
@@ -46,6 +47,9 @@ export function useFirebaseRoom(options: UseFirebaseRoomOptions = {}) {
 
   const botIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const countdownIntervalRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Track whether a countdown has been started for the current room to avoid duplicates
+  const countdownStartedRef = useRef(false);
 
   // Monitor Firebase Connection Status
   useEffect(() => {
@@ -67,6 +71,9 @@ export function useFirebaseRoom(options: UseFirebaseRoomOptions = {}) {
   useEffect(() => {
     if (!db || !activeRoomId || !activePlayerId) return;
 
+    // Reset countdown flag when joining a new room
+    countdownStartedRef.current = false;
+
     const roomRef = dbRef(db, `${ROOMS_PATH}/${activeRoomId}`);
     const playerRef = dbRef(db, `${ROOMS_PATH}/${activeRoomId}/players/${activePlayerId}`);
 
@@ -76,13 +83,11 @@ export function useFirebaseRoom(options: UseFirebaseRoomOptions = {}) {
     const unsubscribe = onValue(roomRef, (snapshot) => {
       const roomVal = snapshot.val();
       if (!roomVal) {
-        // Room was deleted
         setActiveRoomId(null);
         setActivePlayerId(null);
         return;
       }
 
-      // Convert players dictionary to array for compatibility
       const playersDict = roomVal.players || {};
       const playersList = Object.keys(playersDict).map((key) => playersDict[key]);
 
@@ -93,52 +98,70 @@ export function useFirebaseRoom(options: UseFirebaseRoomOptions = {}) {
         targetText: roomVal.targetText,
         maxPlayers: roomVal.maxPlayers,
         countdown: roomVal.countdown,
+        durationSeconds: roomVal.durationSeconds,
+        difficulty: roomVal.difficulty,
+        language: roomVal.language,
       };
 
       optionsRef.current.onRoomUpdate?.(formattedRoomData);
 
       // --- Host specific coordination logic ---
+      // Use the ref values to always get the latest playerId
+      const currentPlayerId = activePlayerIdRef.current;
       const nonBotPlayers = Object.keys(playersDict)
         .filter((id) => !playersDict[id].isBot)
         .sort();
-      const isHost = nonBotPlayers[0] === activePlayerId;
+      const isHost = nonBotPlayers.length > 0 && nonBotPlayers[0] === currentPlayerId;
 
       if (isHost) {
-        // 1. Check if countdown needs to start
-        const allReady = Object.keys(playersDict).length >= 2 && 
-                         Object.keys(playersDict).every((id) => playersDict[id].isReady);
-        
-        if (roomVal.status === 'waiting' && allReady && !countdownIntervalRef.current) {
-          // Trigger countdown
-          let currentCount = 3;
-          dbUpdate(roomRef, { status: 'countdown', countdown: currentCount });
-          optionsRef.current.onCountdownStart?.({ count: currentCount });
+        // 1. Start countdown when all players are ready
+        const allReady =
+          Object.keys(playersDict).length >= 2 &&
+          Object.keys(playersDict).every((id) => playersDict[id].isReady);
 
-          countdownIntervalRef.current = setInterval(async () => {
-            currentCount--;
-            if (currentCount > 0) {
-              dbUpdate(roomRef, { countdown: currentCount });
-              optionsRef.current.onCountdownTick?.({ count: currentCount });
-            } else {
-              if (countdownIntervalRef.current) {
-                clearInterval(countdownIntervalRef.current);
-                countdownIntervalRef.current = null;
-              }
-              const startTime = Date.now();
-              await dbUpdate(roomRef, {
-                status: 'racing',
-                countdown: null,
-                raceStartTime: startTime,
-              });
-              optionsRef.current.onRaceStart?.({
-                targetText: roomVal.targetText,
-                startTime,
-              });
+        if (roomVal.status === 'waiting' && allReady && !countdownStartedRef.current) {
+          // Mark as started BEFORE the async Firebase call to prevent double-trigger
+          countdownStartedRef.current = true;
+
+          let currentCount = 3;
+          const targetText = roomVal.targetText;
+
+          // Update Firebase status immediately
+          dbUpdate(roomRef, { status: 'countdown', countdown: currentCount }).then(() => {
+            optionsRef.current.onCountdownStart?.({ count: currentCount });
+
+            // Clear any existing interval defensively
+            if (countdownIntervalRef.current) {
+              clearInterval(countdownIntervalRef.current);
             }
-          }, 1000);
+
+            countdownIntervalRef.current = setInterval(async () => {
+              currentCount--;
+              if (currentCount > 0) {
+                await dbUpdate(roomRef, { countdown: currentCount });
+                optionsRef.current.onCountdownTick?.({ count: currentCount });
+              } else {
+                // Stop the countdown interval
+                if (countdownIntervalRef.current) {
+                  clearInterval(countdownIntervalRef.current);
+                  countdownIntervalRef.current = null;
+                }
+                const startTime = Date.now();
+                await dbUpdate(roomRef, {
+                  status: 'racing',
+                  countdown: null,
+                  raceStartTime: startTime,
+                });
+                optionsRef.current.onRaceStart?.({
+                  targetText,
+                  startTime,
+                });
+              }
+            }, 1000);
+          });
         }
 
-        // 2. Simulating Bots progress
+        // 2. Simulate Bot progress during race
         if (roomVal.status === 'racing' && !botIntervalRef.current) {
           botIntervalRef.current = setInterval(() => {
             dbGet(roomRef).then((snap) => {
@@ -161,7 +184,7 @@ export function useFirebaseRoom(options: UseFirebaseRoomOptions = {}) {
                 const p = currentPlayersDict[id];
                 if (p.isBot && !p.isFinished) {
                   if (!p.targetWpm) {
-                    p.targetWpm = 45 + Math.floor(Math.random() * 35); // 45-80 WPM
+                    p.targetWpm = 45 + Math.floor(Math.random() * 35);
                   }
 
                   const targetChars = p.targetWpm * 5 * elapsedMinutes;
@@ -208,15 +231,15 @@ export function useFirebaseRoom(options: UseFirebaseRoomOptions = {}) {
         }
       }
 
-      // Cleanup timers when race ends
+      // Cleanup timers when race ends or resets
       if (roomVal.status === 'finished' || roomVal.status === 'waiting') {
         if (botIntervalRef.current) {
           clearInterval(botIntervalRef.current);
           botIntervalRef.current = null;
         }
-        if (countdownIntervalRef.current) {
-          clearInterval(countdownIntervalRef.current);
-          countdownIntervalRef.current = null;
+        if (roomVal.status === 'waiting') {
+          // Reset countdown flag so a new countdown can start
+          countdownStartedRef.current = false;
         }
       }
     });
@@ -346,11 +369,21 @@ export function useFirebaseRoom(options: UseFirebaseRoomOptions = {}) {
 
     if (!db || !roomId || !playerId) return;
 
+    // Stop all timers immediately
+    if (countdownIntervalRef.current) {
+      clearInterval(countdownIntervalRef.current);
+      countdownIntervalRef.current = null;
+    }
+    if (botIntervalRef.current) {
+      clearInterval(botIntervalRef.current);
+      botIntervalRef.current = null;
+    }
+    countdownStartedRef.current = false;
+
     try {
       const playerRef = dbRef(db, `${ROOMS_PATH}/${roomId}/players/${playerId}`);
       await dbRemove(playerRef);
 
-      // Check if room is empty
       const roomPlayersRef = dbRef(db, `${ROOMS_PATH}/${roomId}/players`);
       const snap = await dbGet(roomPlayersRef);
       if (!snap.exists() || Object.keys(snap.val() || {}).length === 0) {

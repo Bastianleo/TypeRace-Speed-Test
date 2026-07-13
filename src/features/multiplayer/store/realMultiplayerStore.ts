@@ -293,7 +293,14 @@ export function useInitializeSocket() {
           isBot: p.isBot || false
         })),
         maxPlayers: roomData.maxPlayers || 4,
-        targetText: roomData.targetText || "The quick brown fox jumps over the lazy dog."
+        targetText: roomData.targetText || "The quick brown fox jumps over the lazy dog.",
+        countdown: roomData.countdown,
+        settings: {
+          durationSeconds: roomData.durationSeconds || 60,
+          difficulty: roomData.difficulty || 'medium',
+          language: roomData.language || 'indonesia',
+          maxPlayers: roomData.maxPlayers || 4
+        }
       };
       
       setRoom(room);
@@ -352,4 +359,8 @@ export function useInitializeSocket() {
   }, [socketHook.isConnected, setConnected]);
 
   return socketHook;
+}
+
+if (typeof window !== "undefined") {
+  (window as any).multiplayerStore = useRealMultiplayerStore;
 }
