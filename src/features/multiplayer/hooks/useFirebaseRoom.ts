@@ -174,6 +174,18 @@ export function useFirebaseRoom(options: UseFirebaseRoomOptions = {}) {
                 return;
               }
 
+              // Check if time is up
+              const elapsedSeconds = (Date.now() - currentRoom.raceStartTime) / 1000;
+              const duration = currentRoom.durationSeconds || 60;
+              if (elapsedSeconds >= duration) {
+                dbUpdate(roomRef, { status: 'finished' });
+                if (botIntervalRef.current) {
+                  clearInterval(botIntervalRef.current);
+                  botIntervalRef.current = null;
+                }
+                return;
+              }
+
               const elapsedMinutes = (Date.now() - currentRoom.raceStartTime) / 60000;
               const currentPlayersDict = currentRoom.players || {};
               const targetTextLength = currentRoom.targetText.length;

@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
+import { motion } from "framer-motion";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -24,6 +25,7 @@ function PlayerCard({ player, isCurrentPlayer }: { player: any; isCurrentPlayer:
         <div className="flex items-center gap-2">
           <span className="font-medium">{player.username}</span>
           {player.isBot && <Badge variant="secondary" className="text-xs">Bot</Badge>}
+          {isCurrentPlayer && <Badge variant="outline" className="text-xs text-blue-500 border-blue-500">Kamu</Badge>}
         </div>
         <div className="flex items-center gap-2">
           <span className="font-mono text-sm font-semibold">{player.wpm} WPM</span>
@@ -35,6 +37,10 @@ function PlayerCard({ player, isCurrentPlayer }: { player: any; isCurrentPlayer:
         </div>
       </div>
       <Progress value={player.progress} className="h-2" />
+      <div className="flex justify-between text-xs text-muted-foreground">
+        <span>{Math.round(player.progress || 0)}%</span>
+        <span>{player.accuracy}% akurasi</span>
+      </div>
     </div>
   );
 }
@@ -68,8 +74,6 @@ function OptionButton({
     </button>
   );
 }
-
-// ── Room Settings Defaults ─────────────────────────────────────
 
 // ── Room Settings Data ─────────────────────────────────────────
 
@@ -135,10 +139,46 @@ const LANGUAGE_OPTIONS: { group: string; items: { label: string; description: st
   },
 ];
 
-// Flat list for summary display
 const ALL_LANGUAGE_ITEMS = LANGUAGE_OPTIONS.flatMap((g) => g.items);
-
 const MAX_PLAYER_OPTIONS = [2, 3, 4, 5, 6, 8];
+
+// ── Timer Hook ────────────────────────────────────────────────
+
+function useRaceTimer(raceActive: boolean, durationSeconds: number, raceStartTime?: number) {
+  const [timeLeft, setTimeLeft] = useState(durationSeconds);
+
+  useEffect(() => {
+    if (!raceActive || !raceStartTime) {
+      setTimeLeft(durationSeconds);
+      return;
+    }
+
+    const calculateTimeLeft = () => {
+      const elapsedSeconds = Math.floor((Date.now() - raceStartTime) / 1000);
+      const remaining = Math.max(0, durationSeconds - elapsedSeconds);
+      return remaining;
+    };
+
+    setTimeLeft(calculateTimeLeft());
+
+    const interval = setInterval(() => {
+      const remaining = calculateTimeLeft();
+      setTimeLeft(remaining);
+      if (remaining <= 0) {
+        clearInterval(interval);
+      }
+    }, 200);
+
+    return () => clearInterval(interval);
+  }, [raceActive, durationSeconds, raceStartTime]);
+
+  const minutes = Math.floor(timeLeft / 60);
+  const seconds = timeLeft % 60;
+  const formatted = `${minutes}:${String(seconds).padStart(2, "0")}`;
+  const pct = Math.round((timeLeft / durationSeconds) * 100);
+
+  return { timeLeft, formatted, pct };
+}
 
 // ── Main Component ─────────────────────────────────────────────
 
@@ -149,15 +189,16 @@ export function MultiplayerLobby() {
   const currentPlayer = useRealMultiplayerStore((s) => s.currentPlayer);
   const cursorIndex = useRealMultiplayerStore((s) => s.cursorIndex);
   const typedChars = useRealMultiplayerStore((s) => s.typedChars);
+  const startedAt = useRealMultiplayerStore((s) => s.startedAt);
   const isConnected = useRealMultiplayerStore((s) => s.isConnected);
   const error = useRealMultiplayerStore((s) => s.error);
   const createRoom = useRealMultiplayerStore((s) => s.createRoom);
   const joinRoom = useRealMultiplayerStore((s) => s.joinRoom);
   const leaveRoom = useRealMultiplayerStore((s) => s.leaveRoom);
   const playerReady = useRealMultiplayerStore((s) => s.playerReady);
-  const addBot = useRealMultiplayerStore((s) => s.addBot);
   const typeChar = useRealMultiplayerStore((s) => s.typeChar);
   const backspace = useRealMultiplayerStore((s) => s.backspace);
+  const startRace = useRealMultiplayerStore((s) => s.startRace);
 
   // ── Room Settings State
   const [duration, setDuration] = useState(60);
@@ -168,10 +209,22 @@ export function MultiplayerLobby() {
   const [joinCode, setJoinCode] = useState("");
   const [showJoin, setShowJoin] = useState(false);
 
-  // Get actual username from auth store
   const authUser = useAuthStore((s) => s.user);
   const playerName = authUser?.username || "Player";
 
+  // Race duration from room settings or default 60s
+  const raceDuration = room?.settings?.durationSeconds ?? 60;
+  const isRacing = room?.status === "racing";
+  const { formatted: timerFormatted, pct: timerPct } = useRaceTimer(isRacing, raceDuration, room?.raceStartTime);
+
+  // Auto-initialize startedAt when race starts (if onRaceStart didn't fire for non-host)
+  useEffect(() => {
+    if (room?.status === "racing" && !startedAt) {
+      startRace(room.targetText, Date.now());
+    }
+  }, [room?.status, startedAt, room?.targetText, startRace]);
+
+  // ── Keyboard Handler ──────────────────────────────────────────
   useEffect(() => {
     if (room?.status !== "racing") return;
 
@@ -184,10 +237,10 @@ export function MultiplayerLobby() {
         return;
       }
 
-      if (e.key.length === 1 && room.targetText[cursorIndex]) {
+      if (e.key.length === 1) {
         e.preventDefault();
         const expected = room.targetText[cursorIndex];
-        if (expected) typeChar(e.key, expected);
+        if (expected !== undefined) typeChar(e.key, expected);
       }
     };
 
@@ -195,7 +248,7 @@ export function MultiplayerLobby() {
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [room?.status, room?.targetText, cursorIndex, typeChar, backspace]);
 
-  // ── No Room: Lobby / Create ────────────────────────────────────
+  // ── No Room: Lobby ────────────────────────────────────────────
   if (!room) {
     return (
       <div className="flex flex-col gap-4">
@@ -239,7 +292,6 @@ export function MultiplayerLobby() {
               </Button>
             </div>
 
-            {/* Join Room Input */}
             {showJoin && (
               <div className="flex gap-2">
                 <input
@@ -264,7 +316,6 @@ export function MultiplayerLobby() {
           </CardContent>
         </Card>
 
-        {/* Create Room Settings Panel */}
         {showCreateSettings && (
           <Card className="border-primary/30">
             <CardHeader>
@@ -272,8 +323,6 @@ export function MultiplayerLobby() {
               <p className="text-sm text-muted-foreground">Sesuaikan mode balapan sebelum membuat room</p>
             </CardHeader>
             <CardContent className="flex flex-col gap-6">
-
-              {/* Duration */}
               <div className="space-y-2">
                 <label className="text-sm font-medium">Durasi Waktu</label>
                 <div className="flex flex-wrap gap-2">
@@ -288,7 +337,6 @@ export function MultiplayerLobby() {
                 </div>
               </div>
 
-              {/* Difficulty */}
               <div className="space-y-2">
                 <label className="text-sm font-medium">Tingkat Kesulitan</label>
                 <div className="flex flex-wrap gap-2">
@@ -304,7 +352,6 @@ export function MultiplayerLobby() {
                 </div>
               </div>
 
-              {/* Language — grouped */}
               <div className="space-y-3">
                 <label className="text-sm font-medium">Bahasa / Teks</label>
                 {LANGUAGE_OPTIONS.map((group) => (
@@ -325,7 +372,6 @@ export function MultiplayerLobby() {
                 ))}
               </div>
 
-              {/* Max Players */}
               <div className="space-y-2">
                 <label className="text-sm font-medium">Jumlah Pemain Maks</label>
                 <div className="flex flex-wrap gap-2">
@@ -340,7 +386,6 @@ export function MultiplayerLobby() {
                 </div>
               </div>
 
-              {/* Summary */}
               <div className="rounded-xl border border-border bg-muted/30 px-4 py-3 text-sm">
                 <p className="font-medium mb-1.5">Ringkasan Room</p>
                 <div className="flex flex-wrap gap-x-4 gap-y-1 text-muted-foreground text-xs">
@@ -373,7 +418,7 @@ export function MultiplayerLobby() {
     );
   }
 
-  // ── Waiting Room ───────────────────────────────────────────────
+  // ── Waiting Room ──────────────────────────────────────────────
   if (room.status === "waiting") {
     return (
       <Card>
@@ -400,54 +445,104 @@ export function MultiplayerLobby() {
             <p className="mb-2 text-sm font-medium">Pemain ({room.players.length}/{room.maxPlayers})</p>
             <div className="space-y-2">
               {room.players.map((p) => (
-                <div key={p.id} className="flex items-center gap-2 rounded-lg border border-border bg-card p-3">
-                  <span className="font-medium">{p.username}</span>
-                  {p.isBot && <Badge variant="secondary" className="text-xs">Bot</Badge>}
-                  {p.isReady && <Badge variant="outline" className="ml-auto text-xs text-green-500 border-green-500">Siap</Badge>}
+                <div
+                  key={p.id}
+                  className={cn(
+                    "flex items-center gap-3 rounded-lg border p-3 transition-colors",
+                    p.isReady
+                      ? "border-green-500/40 bg-green-500/5"
+                      : "border-border bg-card"
+                  )}
+                >
+                  {/* Ready indicator dot */}
+                  <div
+                    className={cn(
+                      "h-3 w-3 flex-shrink-0 rounded-full",
+                      p.isReady ? "bg-green-500" : "bg-muted-foreground/30"
+                    )}
+                  />
+                  <span className="flex-1 font-medium">{p.username}</span>
+                  {p.isBot && (
+                    <Badge variant="secondary" className="text-xs">Bot</Badge>
+                  )}
+                  <span
+                    className={cn(
+                      "text-xs font-semibold",
+                      p.isReady ? "text-green-500" : "text-muted-foreground"
+                    )}
+                  >
+                    {p.isReady ? "Siap" : "Belum Siap"}
+                  </span>
                 </div>
               ))}
               {Array.from({ length: Math.max(0, room.maxPlayers - room.players.length) }).map((_, i) => (
-                <div key={`empty-${i}`} className="flex items-center gap-2 rounded-lg border border-dashed border-border/40 p-3 opacity-40">
+                <div key={`empty-${i}`} className="flex items-center gap-3 rounded-lg border border-dashed border-border/40 p-3 opacity-30">
+                  <div className="h-3 w-3 rounded-full bg-muted-foreground/20" />
                   <span className="text-sm text-muted-foreground">Menunggu pemain...</span>
                 </div>
               ))}
             </div>
           </div>
           <div className="flex flex-wrap gap-3">
-            <Button onClick={playerReady} disabled={!isConnected}>Siap</Button>
+            <Button onClick={playerReady} disabled={!isConnected}> Siap</Button>
             <Button variant="outline" onClick={leaveRoom}>Keluar</Button>
           </div>
+          <p className="text-xs text-muted-foreground">Semua pemain harus menekan &quot;Siap&quot; untuk memulai hitungan mundur.</p>
         </CardContent>
       </Card>
     );
   }
 
-  // ── Countdown ──────────────────────────────────────────────────
+  // ── Countdown ─────────────────────────────────────────────────
   if (room.status === "countdown") {
     return (
       <Card>
         <CardContent className="flex h-64 flex-col items-center justify-center gap-4">
           <p className="text-sm text-muted-foreground">Race dimulai dalam</p>
-          <p className="font-mono text-8xl font-bold text-primary">{room.countdown}</p>
+          <p className="font-mono text-8xl font-bold text-primary animate-pulse">{room.countdown ?? "..."}</p>
+          <p className="text-xs text-muted-foreground">Siapkan jari Anda!</p>
         </CardContent>
       </Card>
     );
   }
 
-  // ── Racing / Finished ──────────────────────────────────────────
+  // ── Racing / Finished ─────────────────────────────────────────
   if (room.status === "racing" || room.status === "finished") {
     return (
-      <div className="flex flex-col gap-6">
+      <div className="flex flex-col gap-4">
+        {/* Header: timer + status */}
+        <div className="flex items-center justify-between rounded-xl border border-border bg-card px-5 py-3">
+          <div className="flex items-center gap-3">
+            {room.status === "racing" ? (
+              <>
+                <div className="flex flex-col items-center">
+                  <span className="font-mono text-3xl font-bold text-primary leading-none">{timerFormatted}</span>
+                  <span className="text-[10px] text-muted-foreground mt-0.5">Sisa Waktu</span>
+                </div>
+                <div className="w-24">
+                  <Progress value={timerPct} className="h-1.5" />
+                </div>
+              </>
+            ) : (
+              <Badge className="bg-emerald-500/10 text-emerald-600 border-emerald-500/20 border text-sm px-3 py-1">
+                🏁 Race Selesai
+              </Badge>
+            )}
+          </div>
+          <div className="flex items-center gap-4 text-sm text-muted-foreground">
+            {currentPlayer && (
+              <>
+                <span><span className="font-semibold text-foreground">{currentPlayer.wpm}</span> WPM</span>
+                <span><span className="font-semibold text-foreground">{currentPlayer.accuracy}%</span> Akurasi</span>
+              </>
+            )}
+          </div>
+        </div>
+
+        {/* Player leaderboard */}
         <Card>
           <CardHeader>
-            <div className="flex items-center justify-between">
-              <p className="font-medium">Pemain</p>
-              {room.status === "finished" && (
-                <Badge className="bg-emerald-500/10 text-emerald-600 border-emerald-500/20 border">
-                  Race Selesai
-                </Badge>
-              )}
-            </div>
+            <p className="font-medium">Papan Pemain</p>
           </CardHeader>
           <CardContent className="space-y-2">
             {room.players
@@ -458,40 +553,112 @@ export function MultiplayerLobby() {
           </CardContent>
         </Card>
 
-        <Card>
-          <CardHeader>
-            <p className="text-sm text-muted-foreground">Teks Target</p>
-          </CardHeader>
-          <CardContent>
-            <div className="rounded-lg border border-border bg-card p-4 font-mono text-lg leading-relaxed">
-              {room.targetText.split("").map((char, i) => {
-                const typed = typedChars[i];
-                const isCurrent = i === cursorIndex;
-                return (
-                  <span
-                    key={i}
-                    className={cn(
-                      "relative",
-                      typed?.status === "correct" && "text-emerald-500",
-                      typed?.status === "incorrect" && "text-destructive underline decoration-2 underline-offset-4",
-                      !typed && !isCurrent && "text-foreground/40",
-                      isCurrent && "underline decoration-2 underline-offset-2"
-                    )}
-                  >
-                    {char}
-                  </span>
-                );
-              })}
-            </div>
-          </CardContent>
-        </Card>
-
-        {room.status === "finished" && (
-          <div className="flex gap-3">
-            <Button onClick={() => createRoom()}>Race Lagi</Button>
-            <Button variant="outline" onClick={leaveRoom}>Keluar</Button>
-          </div>
+        {/* Typing area */}
+        {room.status === "racing" && (
+          <Card>
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <p className="text-sm text-muted-foreground">Teks Target — ketik di sini</p>
+                <p className="text-xs text-muted-foreground font-mono">{cursorIndex}/{room.targetText.length} karakter</p>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <div
+                className="rounded-lg border border-border bg-card/50 p-4 font-mono text-lg leading-relaxed cursor-text focus:outline-none"
+                tabIndex={0}
+                onFocus={() => { }} // ensures div is focusable
+              >
+                {room.targetText.split("").map((char, i) => {
+                  const typed = typedChars[i];
+                  const isCurrent = i === cursorIndex;
+                  return (
+                    <span
+                      key={i}
+                      className={cn(
+                        "relative transition-colors",
+                        typed?.status === "correct" && "text-emerald-500",
+                        typed?.status === "incorrect" && "text-destructive underline decoration-2 underline-offset-4",
+                        !typed && !isCurrent && "text-foreground/40"
+                      )}
+                    >
+                      {isCurrent && (
+                        <motion.span
+                          layoutId="typing-cursor"
+                          className="absolute -left-[1px] top-0 h-full w-[2px] bg-primary animate-pulse"
+                          transition={{ duration: 0.12 }}
+                        />
+                      )}
+                      {char}
+                    </span>
+                  );
+                })}
+              </div>
+              <p className="mt-2 text-xs text-muted-foreground text-center">
+                Klik area teks di atas lalu mulai mengetik
+              </p>
+            </CardContent>
+          </Card>
         )}
+
+        {/* Finished: results */}
+        {room.status === "finished" && (
+          <Card>
+            <CardHeader>
+              <p className="font-medium">Hasil Akhir</p>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-2">
+                {room.players
+                  .sort((a, b) => {
+                    // 1. Finished players go first
+                    if (a.isFinished && !b.isFinished) return -1;
+                    if (!a.isFinished && b.isFinished) return 1;
+
+                    // 2. If both finished, sort by finishRank
+                    if (a.isFinished && b.isFinished) {
+                      return (a.finishRank ?? 99) - (b.finishRank ?? 99);
+                    }
+
+                    // 3. If neither finished, sort by progress (descending)
+                    if ((b.progress || 0) !== (a.progress || 0)) {
+                      return (b.progress || 0) - (a.progress || 0);
+                    }
+
+                    // 4. Fallback to WPM
+                    return (b.wpm || 0) - (a.wpm || 0);
+                  })
+                  .map((p) => (
+                    <div
+                      key={p.id}
+                      className={cn(
+                        "flex items-center justify-between rounded-lg border border-border p-3",
+                        p.id === currentPlayer?.id && "border-primary bg-accent/30"
+                      )}
+                    >
+                      <div className="flex items-center gap-2">
+                        <span className="font-mono font-bold text-lg w-8">
+                          {p.finishRank === 1 ? "🥇" : p.finishRank === 2 ? "🥈" : p.finishRank === 3 ? "🥉" : `#${p.finishRank ?? "-"}`}
+                        </span>
+                        <span className="font-medium">{p.username}</span>
+                        {p.isBot && <Badge variant="secondary" className="text-xs">Bot</Badge>}
+                      </div>
+                      <div className="flex gap-4 text-sm text-muted-foreground">
+                        <span><span className="font-semibold text-foreground">{p.wpm}</span> WPM</span>
+                        <span><span className="font-semibold text-foreground">{p.accuracy}%</span></span>
+                      </div>
+                    </div>
+                  ))}
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        <div className="flex gap-3">
+          {room.status === "finished" && (
+            <Button onClick={() => createRoom(playerName, room.settings)}>Race Lagi</Button>
+          )}
+          <Button variant="outline" onClick={leaveRoom}>Keluar Room</Button>
+        </div>
       </div>
     );
   }

@@ -60,5 +60,6 @@ export interface Room {
   maxPlayers: number;
   targetText: string;
   countdown?: number;
+  raceStartTime?: number;
   settings?: RoomSettings;
 }

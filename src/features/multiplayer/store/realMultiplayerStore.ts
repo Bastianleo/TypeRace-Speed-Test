@@ -288,6 +288,7 @@ export function useInitializeSocket() {
           progress: p.progress || 0,
           wpm: p.wpm || 0,
           accuracy: p.accuracy || 100,
+          isReady: p.isReady || false,
           isFinished: p.isFinished || false,
           finishRank: p.finishRank || undefined,
           isBot: p.isBot || false
@@ -295,6 +296,7 @@ export function useInitializeSocket() {
         maxPlayers: roomData.maxPlayers || 4,
         targetText: roomData.targetText || "The quick brown fox jumps over the lazy dog.",
         countdown: roomData.countdown,
+        raceStartTime: roomData.raceStartTime,
         settings: {
           durationSeconds: roomData.durationSeconds || 60,
           difficulty: roomData.difficulty || 'medium',
