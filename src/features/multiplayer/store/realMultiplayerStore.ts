@@ -1,6 +1,6 @@
 import { useEffect } from "react";
 import { create } from "zustand";
-import { useSocket } from "../hooks/useSocket";
+import { useFirebaseRoom } from "../hooks/useFirebaseRoom";
 import type { Room, Player, RoomStatus } from "../types/multiplayer.types";
 
 interface RealMultiplayerState {
@@ -253,16 +253,16 @@ export function useInitializeSocket() {
   const setError = useRealMultiplayerStore(state => state.setError);
   const startRace = useRealMultiplayerStore(state => state.startRace);
   
-  const socketHook = useSocket({
+  const socketHook = useFirebaseRoom({
     onConnect: () => {
-      console.log("Socket connected");
+      console.log("Firebase connected");
       setConnected(true);
       setError(null);
     },
     onDisconnect: () => {
-      console.log("Socket disconnected");
+      console.log("Firebase disconnected");
       setConnected(false);
-      setError("Disconnected from server. Attempting to reconnect...");
+      setError("Disconnected from Firebase. Reconnecting...");
     },
     onRoomCreated: (data) => {
       console.log("Room created:", data);
