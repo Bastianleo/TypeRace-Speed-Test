@@ -292,7 +292,7 @@ export function MultiplayerLobby() {
               <Button
                 size="lg"
                 disabled={!isConnected}
-                onClick={() => setShowCreateSettings((v) => !v)}
+                onClick={() => { setShowCreateSettings((v) => !v); setShowJoin(false); }}
               >
                 Buat Room
               </Button>
