@@ -67,6 +67,18 @@ export function useFirebaseRoom(options: UseFirebaseRoomOptions = {}) {
     return () => unsubscribe();
   }, []);
 
+  // Restore room session on mount
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const savedRoomId = localStorage.getItem('typerace_room_id');
+      const savedPlayerId = localStorage.getItem('typerace_player_id');
+      if (savedRoomId && savedPlayerId) {
+        setActiveRoomId(savedRoomId);
+        setActivePlayerId(savedPlayerId);
+      }
+    }
+  }, []);
+
   // Monitor Room Changes
   useEffect(() => {
     if (!db || !activeRoomId || !activePlayerId) return;
@@ -85,10 +97,34 @@ export function useFirebaseRoom(options: UseFirebaseRoomOptions = {}) {
       if (!roomVal) {
         setActiveRoomId(null);
         setActivePlayerId(null);
+        if (typeof window !== 'undefined') {
+          localStorage.removeItem('typerace_room_id');
+          localStorage.removeItem('typerace_player_id');
+        }
         return;
       }
 
       const playersDict = roomVal.players || {};
+      const currentPlayerId = activePlayerIdRef.current;
+
+      // Self-healing: if the player is missing (e.g. removed by onDisconnect) but room is active, re-insert them
+      if (currentPlayerId && !playersDict[currentPlayerId] && (roomVal.status === 'waiting' || roomVal.status === 'racing')) {
+        const savedUsername = typeof window !== 'undefined' ? localStorage.getItem('typerace_username') || 'Player' : 'Player';
+        const restoredPlayer = {
+          id: currentPlayerId,
+          username: savedUsername,
+          progress: 0,
+          wpm: 0,
+          accuracy: 100,
+          isReady: roomVal.status === 'racing',
+          isFinished: false,
+          finishRank: null,
+          isBot: false,
+        };
+        dbSet(dbRef(db, `${ROOMS_PATH}/${activeRoomId}/players/${currentPlayerId}`), restoredPlayer);
+        return;
+      }
+
       const playersList = Object.keys(playersDict).map((key) => playersDict[key]);
 
       const formattedRoomData = {
@@ -98,6 +134,7 @@ export function useFirebaseRoom(options: UseFirebaseRoomOptions = {}) {
         targetText: roomVal.targetText,
         maxPlayers: roomVal.maxPlayers,
         countdown: roomVal.countdown,
+        raceStartTime: roomVal.raceStartTime,
         durationSeconds: roomVal.durationSeconds,
         difficulty: roomVal.difficulty,
         language: roomVal.language,
@@ -107,7 +144,6 @@ export function useFirebaseRoom(options: UseFirebaseRoomOptions = {}) {
 
       // --- Host specific coordination logic ---
       // Use the ref values to always get the latest playerId
-      const currentPlayerId = activePlayerIdRef.current;
       const nonBotPlayers = Object.keys(playersDict)
         .filter((id) => !playersDict[id].isBot)
         .sort();
@@ -417,7 +453,9 @@ export function useFirebaseRoom(options: UseFirebaseRoomOptions = {}) {
 
     try {
       const playerReadyRef = dbRef(db, `${ROOMS_PATH}/${roomId}/players/${playerId}/isReady`);
-      await dbSet(playerReadyRef, true);
+      const snap = await dbGet(playerReadyRef);
+      const currentlyReady = snap.val() === true;
+      await dbSet(playerReadyRef, !currentlyReady);
     } catch (err) {
       console.error('Gagal menyetel ready:', err);
     }

@@ -224,6 +224,20 @@ export function MultiplayerLobby() {
     }
   }, [room?.status, startedAt, room?.targetText, startRace]);
 
+  // ── Block page refresh/close during race ──────────────────────
+  useEffect(() => {
+    if (room?.status !== "racing") return;
+
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      e.preventDefault();
+      e.returnValue = "Apakah Anda yakin ingin meninggalkan balapan?";
+      return e.returnValue;
+    };
+
+    window.addEventListener("beforeunload", handleBeforeUnload);
+    return () => window.removeEventListener("beforeunload", handleBeforeUnload);
+  }, [room?.status]);
+
   // ── Keyboard Handler ──────────────────────────────────────────
   useEffect(() => {
     if (room?.status !== "racing") return;
@@ -441,6 +455,30 @@ export function MultiplayerLobby() {
           </div>
         </CardHeader>
         <CardContent className="flex flex-col gap-6">
+          {/* Room Info Grid (Time, Difficulty, Language) */}
+          {room.settings && (
+            <div className="grid grid-cols-3 gap-3 rounded-xl border border-border bg-muted/10 p-3.5 text-center">
+              <div className="space-y-1">
+                <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">Durasi</p>
+                <p className="font-semibold text-sm">
+                  {DURATION_OPTIONS.find((d) => d.value === room.settings?.durationSeconds)?.label ?? `${room.settings?.durationSeconds ?? 60} detik`}
+                </p>
+              </div>
+              <div className="space-y-1 border-x border-border">
+                <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">Kesulitan</p>
+                <p className="font-semibold text-sm capitalize">
+                  {DIFFICULTY_OPTIONS.find((d) => d.value === room.settings?.difficulty)?.label ?? room.settings?.difficulty}
+                </p>
+              </div>
+              <div className="space-y-1">
+                <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">Bahasa</p>
+                <p className="font-semibold text-sm">
+                  {ALL_LANGUAGE_ITEMS.find((l) => l.value === room.settings?.language)?.label ?? room.settings?.language}
+                </p>
+              </div>
+            </div>
+          )}
+
           <div>
             <p className="mb-2 text-sm font-medium">Pemain ({room.players.length}/{room.maxPlayers})</p>
             <div className="space-y-2">
@@ -484,7 +522,16 @@ export function MultiplayerLobby() {
             </div>
           </div>
           <div className="flex flex-wrap gap-3">
-            <Button onClick={playerReady} disabled={!isConnected}> Siap</Button>
+            <Button
+              onClick={playerReady}
+              disabled={!isConnected}
+              variant={currentPlayer?.isReady ? "outline" : "default"}
+              className={cn(
+                currentPlayer?.isReady && "border-green-500 text-green-600 hover:bg-green-50 dark:hover:bg-green-950/20"
+              )}
+            >
+              {currentPlayer?.isReady ? "✓ Batal Siap" : "Siap"}
+            </Button>
             <Button variant="outline" onClick={leaveRoom}>Keluar</Button>
           </div>
           <p className="text-xs text-muted-foreground">Semua pemain harus menekan &quot;Siap&quot; untuk memulai hitungan mundur.</p>
