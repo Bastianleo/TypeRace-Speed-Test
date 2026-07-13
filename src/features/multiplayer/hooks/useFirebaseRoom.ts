@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { db } from '@/lib/firebase';
+import { generateTestText } from '@/features/typing-test/utils/wordLists';
 import {
   ref as dbRef,
   set as dbSet,
@@ -23,12 +24,6 @@ interface UseFirebaseRoomOptions {
 }
 
 const ROOMS_PATH = 'rooms';
-
-const WORD_LISTS: Record<string, string> = {
-  indonesia: "Kucing oranye itu meloncat dengan lincah di atas atap rumah yang hangat. Latihan yang teratur akan membentuk memori otot pada jari-jari Anda, yang merupakan kunci utama untuk mengetik lebih cepat dan akurat tanpa harus melihat tombol keyboard.",
-  english: "The quick brown fox jumps over the lazy dog. Practice makes perfect in typing speed tests. Consistent training builds muscle memory, which is the key to typing faster and with fewer mistakes on any keyboard layout.",
-  japanese: "The quick brown fox jumps over the lazy dog. Practice makes perfect in typing speed tests.",
-};
 
 export function useFirebaseRoom(options: UseFirebaseRoomOptions = {}) {
   const [isConnected, setIsConnected] = useState(false);
@@ -319,7 +314,18 @@ export function useFirebaseRoom(options: UseFirebaseRoomOptions = {}) {
       const playerId = `player_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
 
       const language = settings?.language || 'indonesia';
-      const targetText = WORD_LISTS[language] || WORD_LISTS.english;
+      const difficulty = (settings?.difficulty || 'medium') as any;
+
+      let genLang = language;
+      let progLang: any = undefined;
+
+      if (language.startsWith('code_')) {
+        genLang = 'programming';
+        progLang = language.replace('code_', '');
+      }
+
+      // Generate randomized text dynamically for this session
+      const targetText = generateTestText(genLang as any, difficulty, progLang);
 
       const initialRoom = {
         id: roomId,
